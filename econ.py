@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 
-st.set_page_config(layout="wide", page_title="National Digital Twin Pipeline")
+# Sayfa Yapılandırması
+st.set_page_config(layout="wide", page_title="National Digital Twin Dashboard")
 
 def safe_rerun():
     if hasattr(st, "rerun"):
@@ -79,24 +80,24 @@ def generate_national_master_dataset():
 generate_national_master_dataset()
 df_national_master = pd.read_csv(DATASET_PATH)
 
-# Regional Capacities
+# Bölgesel İstasyon Kapasiteleri (Anahtarlar ve Yapı Netleştirildi)
 if 'station_capacities' not in st.session_state:
     st.session_state.station_capacities = {
-        'Istanbul_Central': {'Status': 'CRITICAL', 'Load': '92%', 'Base_Fee': '$90', 'Promo': '0%'},
-        'Ankara_Hub': {'Status': 'BALANCED', 'Load': '54%', 'Base_Fee': '$85', 'Promo': '15%'},
-        'Izmir_West': {'Status': 'OPTIMAL', 'Load': '31%', 'Base_Fee': '$80', 'Promo': '25%'},
-        'Bursa_East': {'Status': 'BALANCED', 'Load': '62%', 'Base_Fee': '$85', 'Promo': '10%'},
-        'Antalya_South': {'Status': 'OPTIMAL', 'Load': '24%', 'Base_Fee': '$75', 'Promo': '30%'}
+        'Istanbul': {'Status': '🔴 CRITICAL', 'Load': '92%', 'Base_Fee': '$90', 'Promo': '0%'},
+        'Ankara': {'Status': '🟡 BALANCED', 'Load': '54%', 'Base_Fee': '$85', 'Promo': '15%'},
+        'Izmir': {'Status': '🟢 OPTIMAL', 'Load': '31%', 'Base_Fee': '$80', 'Promo': '25%'},
+        'Bursa': {'Status': '🟡 BALANCED', 'Load': '62%', 'Base_Fee': '$85', 'Promo': '10%'},
+        'Antalya': {'Status': '🟢 OPTIMAL', 'Load': '24%', 'Base_Fee': '$75', 'Promo': '30%'}
     }
 
 if 'pointer' not in st.session_state: st.session_state.pointer = 0
 if 'network_intercept_logs' not in st.session_state: st.session_state.network_intercept_logs = []
 
 # ====================================================================
-# UI DESIGN
+# DARK MODE STYLED UI DESIGN
 # ====================================================================
-st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🌐 National Cyber-Physical Transportation & Inspection Twin</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #555;'>Macro Network Load-Balancing, Dynamic Toll Incentives, and Risk-Based Predictive Recalls</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #38BDF8;'>🌐 National Cyber-Physical Transportation Twin</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #94A3B8;'>Macro Network Load-Balancing, Dynamic Toll Incentives, and Risk-Based Predictive Recalls</p>", unsafe_allow_html=True)
 st.divider()
 
 col_left, col_right = st.columns([1.5, 1.5], gap="large")
@@ -105,8 +106,8 @@ col_left, col_right = st.columns([1.5, 1.5], gap="large")
 # SOL SÜTUN: HGS AKIŞI VE AKILLI YÖNLENDİRME
 # --------------------------------------------------------------------
 with col_left:
-    st.markdown("### 🛣️ 1. National Highway Gantry Stream & AI Routing Engine")
-    st.caption("Processes vehicle batches passing through various cities. Uses predictive risk modeling and real-time station load maps to route traffic dynamically away from bottleneck points.")
+    st.markdown("<h3 style='color: #38BDF8;'>🛣️ 1. National Highway Gantry Stream & AI Routing Engine</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Processes vehicle batches passing through various cities. Uses predictive risk modeling and real-time station load maps to route traffic dynamically away from bottleneck points.</p>", unsafe_allow_html=True)
     
     if st.button("📡 Scan National Highway Traffic (Process Next Fleet)", type="primary", use_container_width=True):
         start = st.session_state.pointer
@@ -121,17 +122,18 @@ with col_left:
             risk = car['AI_Calculated_Risk_Pct']
             months = car['Months_Since_Last_Inspection']
             
-            target_station = f"{city}_Central" if city in ['Istanbul', 'Ankara'] else (f"{city}_West" if city=='Izmir' else (f"{city}_East" if city=='Bursa' else f"{city}_South"))
-            station_info = st.session_state.station_capacities.get(target_station, {'Status': 'BALANCED', 'Promo': '10%'})
+            # GÜVENLİ SÖZLÜK SORGUSU (KeyError Önleyici):
+            station_info = st.session_state.station_capacities.get(city, {'Status': '🟡 BALANCED', 'Load': '50%', 'Base_Fee': '$85', 'Promo': '10%'})
+            promo_rate = station_info.get('Promo', '10%')
             
             if months > 24:
-                directive = "🔴 EXPIRED: Citation issued via HGS."
+                directive = "❌ EXPIRED: Citation issued via HGS."
             elif risk > 75.0:
-                directive = f"🚨 PREDICTIVE RECALL: Risk {risk}%! Diverted."
-            elif station_info['Status'] == 'CRITICAL':
-                directive = f"🔀 REROUTED: Station full. Sent to alternative zone with {station_info['Promo']} discount."
+                directive = f"⚠️ RECALL: Risk {risk}%! Diverted."
+            elif station_info['Status'] == '🔴 CRITICAL':
+                directive = f"🔄 REROUTED: Station full. Sent to alternative zone with {promo_rate} discount."
             else:
-                directive = "✅ COMPLIANT: Cleared on transit grid."
+                directive = "⚡ COMPLIANT: Cleared on transit grid."
                 
             st.session_state.network_intercept_logs.insert(0, {
                 "Plate ID": v_id,
@@ -150,7 +152,7 @@ with col_left:
         st.code("Distributed highway infrastructure online. Awaiting data ingestion...", language="markdown")
 
     st.write("---")
-    st.markdown("#### 🏢 Cross-Regional Facility Capacities")
+    st.markdown("<h4 style='color: #E2E8F0;'>🏢 Cross-Regional Facility Capacities</h4>", unsafe_allow_html=True)
     capacity_df = pd.DataFrame.from_dict(st.session_state.station_capacities, orient='index').reset_index().rename(columns={'index': 'Station Node'})
     st.table(capacity_df)
 
@@ -158,46 +160,46 @@ with col_left:
 # SAĞ SÜTUN: YÜKSEK RİSKLİ ARAÇLAR MÜDAHALE PANELİ VE SENSÖR ODASI
 # --------------------------------------------------------------------
 with col_right:
-    st.markdown("### ⚠️ 2. High-Risk Vehicle Intervention Room")
-    st.caption("Filters live vehicle registries from the dataset with crashes, heavy mileage, and dynamic failure/fire risk > 75%.")
+    st.markdown("<h3 style='color: #FBBF24;'>⚠️ 2. High-Risk Vehicle Intervention Room</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Filters live vehicle registries from the dataset with crashes, heavy mileage, and dynamic failure/fire risk > 75%.</p>", unsafe_allow_html=True)
     
-    # Filter vehicles with risk > 75%
+    # Risk skoru %75 üstü olan araçları çekiyoruz
     high_risk_fleet = df_national_master[df_national_master['AI_Calculated_Risk_Pct'] > 75.0].head(5)
     
     display_risk_df = high_risk_fleet[['Vehicle_ID', 'Vehicle_Class', 'HGS_Est_Total_KM', 'Major_Chassis_Accident', 'AI_Calculated_Risk_Pct']]
     st.dataframe(display_risk_df, use_container_width=True, hide_index=True)
     
-    # Dropdown plate selector
+    # Seçim alanı
     selected_target = st.selectbox("🎯 Select a High-Risk Vehicle Plate to Intervene:", high_risk_fleet['Vehicle_ID'].tolist())
     
     c1, c2 = st.columns(2)
     with c1:
         if st.button("✉️ Send Compulsory Emergency SMS", use_container_width=True):
-            st.toast(f"SMS Sent to {selected_target}: 'Critical technical anomaly predicted. Book inspection within 48h to prevent registration suspension!'", icon="✉️")
+            st.toast(f"SMS Sent to {selected_target}: 'Critical technical anomaly predicted. Book inspection within 48h!'", icon="✉️")
     with c2:
         if st.button("🛑 Lock HGS Gantry / Issue Fine", use_container_width=True):
-            st.toast(f"HGS Blacklist Active for {selected_target}! Automated fine logged at next highway toll.", icon="🚨")
+            st.toast(f"HGS Blacklist Active for {selected_target}! Automated fine logged.", icon="🚨")
 
     st.write("---")
     
     # DIAGNOSTIC TESTING CELL
-    st.markdown("### 🔬 3. National Diagnostic Validation Grid")
+    st.markdown("<h3 style='color: #34D399;'>🔬 3. National Diagnostic Validation Grid</h3>", unsafe_allow_html=True)
     if st.button("🧪 Pull Selected High-Risk Unit into Hardware Scanner", use_container_width=True):
         test_car = df_national_master[df_national_master['Vehicle_ID'] == selected_target].iloc[0]
         
-        st.markdown(f"**Inspecting Asset:** `{test_car['Vehicle_ID']}` | **Class:** {test_car['Vehicle_Class']} | **Risk Index:** {test_car['AI_Calculated_Risk_Pct']}%")
+        st.markdown(f"**Inspecting Asset:** `{test_car['Vehicle_ID']}` | **Class:** {test_car['Vehicle_Class']} | **Risk Index:** <span style='color: #F87171;'>{test_car['AI_Calculated_Risk_Pct']}%</span>", unsafe_allow_html=True)
         
         if test_car['Vehicle_Class'] in ['ICE', 'Heavy_Duty']:
             st.markdown("**Sensor Output: Gas Chromatography Diagnostics**")
-            st.metric(label="LIVE NOx EMISSIONS", value=f"{test_car['Measured_NOx_ppm']} ppm", help="Binek Limit: 150 ppm, Heavy Duty: 300 ppm")
+            st.metric(label="LIVE NOx EMISSIONS", value=f"{test_car['Measured_NOx_ppm']} ppm")
             if test_car['Measured_NOx_ppm'] > 150.0:
-                st.error("🚨 **VERDICT: CRITICAL FAIL (Euro 6 Violation)**\n\nHigh mileage/accident strains caused catalyst poisoning or software bypass detection.")
+                st.error("🚨 VERDICT: CRITICAL FAIL (Euro 6 Violation)\n\nHigh mileage/accident strains caused catalyst poisoning or software bypass detection.")
             else:
-                st.success("✅ **VERDICT: PASS**")
+                st.success("✅ VERDICT: PASS")
         else: # EV
             st.markdown("**Sensor Output: ECE-R100 Isolation Ohmmeter Scan**")
-            st.metric(label="LIVE PACK DIELECTRIC RESISTANCE", value=f"{test_car['Measured_Isolation_M_Ohm']} MΩ", help="Danger Threshold: < 100.0 MΩ")
+            st.metric(label="LIVE PACK DIELECTRIC RESISTANCE", value=f"{test_car['Measured_Isolation_M_Ohm']} MΩ")
             if test_car['Measured_Isolation_M_Ohm'] < 100.0:
-                st.error("🚨 **VERDICT: EMERGENCY SAFETY FAIL (High Thermal Runaway Risk)**\n\nECE-R100 isolation parameters breached due to structural chassis accident.")
+                st.error("🚨 VERDICT: EMERGENCY SAFETY FAIL (High Thermal Runaway Risk)\n\nECE-R100 isolation parameters breached due to structural chassis accident.")
             else:
-                st.success("✅ **VERDICT: PASS**")
+                st.success("✅ VERDICT: PASS")
