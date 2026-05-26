@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import time
 
-# Sürüm uyumluluğu için dinamik rerun fonksiyonu tanımlıyoruz
+# ==========================================
+# BACKWARD COMPATIBILITY FUNCTION FOR RERUN
+# ==========================================
+# This function automatically detects your Streamlit version to prevent AttributeError
 def safe_rerun():
     if hasattr(st, "rerun"):
         st.rerun()
@@ -12,184 +14,125 @@ def safe_rerun():
         st.experimental_rerun()
 
 # ==========================================
-# 1. VERİ SETİ GENERATÖRÜ
+# 1. INTERNAL SYNTHETIC DATA GENERATOR (Zero-File Dependency)
 # ==========================================
-def generate_project_dataset():
+@st.cache_data
+def get_internal_data():
     np.random.seed(42)
-    n_samples = 1500
-    vehicle_ids = [f"TR-{np.random.randint(10,81)}{np.random.choice(['A','B','C','D'])}{np.random.choice(['A','B','C','D'])}{np.random.randint(100,999)}" for _ in range(n_samples)]
+    n_samples = 1000
+    vehicle_ids = [f"TR-{np.random.randint(10,81)}{np.random.choice(['A','B'])}{np.random.choice(['A','B'])}{np.random.randint(100,999)}" for _ in range(n_samples)]
     vehicle_types = np.random.choice(['ICE', 'EV'], size=n_samples, p=[0.7, 0.3])
     ages = np.random.randint(1, 15, size=n_samples)
-    
     appointment_statuses = np.random.choice(['Scheduled_OnTime', 'No_Show', 'No_Appointment_Unlawful'], size=n_samples, p=[0.75, 0.10, 0.15])
     tolerance_days_left = np.random.randint(-15, 7, size=n_samples)
     
-    data = {
+    df = pd.DataFrame({
         'Vehicle_ID': vehicle_ids,
         'Vehicle_Type': vehicle_types,
         'Age': ages,
         'Appointment_Status': appointment_statuses,
         'Tolerance_Days_Left': tolerance_days_left,
-        'CO2_Emissions': [np.nan] * n_samples,
-        'NOx_Emissions': [np.nan] * n_samples,
-        'OBD_Emission_Status': ['Normal'] * n_samples,
-        'AdBlue_Emulator_Detected': [0] * n_samples,
-        'ECU_Remap_Flag': [0] * n_samples,
-        'Insulation_Resistance_M_Ohm': [np.nan] * n_samples,
-        'Battery_SoH': [np.nan] * n_samples,
-        'Max_Cell_Temp_C': [np.nan] * n_samples,
-        'BMS_Status': ['Normal'] * n_samples,
-        'Brake_Efficiency_Pct': np.random.uniform(55, 95, size=n_samples),
+        'NOx_Emissions': np.where(vehicle_types == 'ICE', 45 + ages * 4 + np.random.normal(0, 8, n_samples), np.nan),
+        'Insulation_Resistance_M_Ohm': np.where(vehicle_types == 'EV', np.random.uniform(250, 900, n_samples), np.nan),
+        'Max_Cell_Temp_C': np.where(vehicle_types == 'EV', 28 + ages * 0.8 + np.random.normal(0, 2, n_samples), np.nan),
         'Inspection_Result': ['Pass'] * n_samples
-    }
+    })
     
-    df = pd.DataFrame(data)
+    # Inject fraud and defect rules
+    df.loc[(df['Vehicle_Type'] == 'ICE') & (df['Age'] > 10), 'NOx_Emissions'] += 200
+    df.loc[(df['Vehicle_Type'] == 'ICE') & (df['NOx_Emissions'] > 100), 'Inspection_Result'] = 'Fail_Emission_Fraud'
     
-    ice_mask = df['Vehicle_Type'] == 'ICE'
-    n_ice = ice_mask.sum()
-    df.loc[ice_mask, 'CO2_Emissions'] = 110 + df.loc[ice_mask, 'Age'] * 7 + np.random.normal(0, 10, n_ice)
-    df.loc[ice_mask, 'NOx_Emissions'] = 45 + df.loc[ice_mask, 'Age'] * 4 + np.random.normal(0, 8, n_ice)
+    df.loc[(df['Vehicle_Type'] == 'EV') & (df['Age'] > 11), 'Insulation_Resistance_M_Ohm'] = 45
+    df.loc[(df['Vehicle_Type'] == 'EV') & (df['Insulation_Resistance_M_Ohm'] < 100), 'Inspection_Result'] = 'Fail_EV_Safety'
     
-    fraud_ice = np.random.choice(df[ice_mask].index, size=int(n_ice * 0.12), replace=False)
-    df.loc[fraud_ice, 'NOx_Emissions'] += np.random.uniform(180, 350, size=len(fraud_ice))
-    df.loc[fraud_ice, 'AdBlue_Emulator_Detected'] = 1
-    df.loc[fraud_ice, 'ECU_Remap_Flag'] = 1
-    
-    ev_mask = df['Vehicle_Type'] == 'EV'
-    n_ev = ev_mask.sum()
-    df.loc[ev_mask, 'Insulation_Resistance_M_Ohm'] = np.random.uniform(250, 900, size=n_ev)
-    df.loc[ev_mask, 'Battery_SoH'] = 100 - df.loc[ev_mask, 'Age'] * np.random.uniform(1.8, 3.2, size=n_ev)
-    df.loc[ev_mask, 'Max_Cell_Temp_C'] = 28 + df.loc[ev_mask, 'Age'] * 0.8 + np.random.normal(0, 2, n_ev)
-    
-    unsafe_ev = np.random.choice(df[ev_mask].index, size=int(n_ev * 0.09), replace=False)
-    df.loc[unsafe_ev, 'Insulation_Resistance_M_Ohm'] = np.random.uniform(10, 85, size=len(unsafe_ev))
-    df.loc[unsafe_ev, 'Max_Cell_Temp_C'] += np.random.uniform(25, 45, size=len(unsafe_ev))
-    df.loc[unsafe_ev, 'BMS_Status'] = 'Critical_Fault'
-    
-    df.loc[df['Brake_Efficiency_Pct'] < 60, 'Inspection_Result'] = 'Fail_Mechanical'
-    df.loc[(df['Vehicle_Type'] == 'ICE') & ((df['NOx_Emissions'] > 170) | (df['AdBlue_Emulator_Detected'] == 1)), 'Inspection_Result'] = 'Fail_Emission_Fraud'
-    df.loc[(df['Vehicle_Type'] == 'EV') & ((df['Insulation_Resistance_M_Ohm'] < 100) | (df['Max_Cell_Temp_C'] > 55)), 'Inspection_Result'] = 'Fail_EV_Safety'
-    
-    df.to_csv('digital_twin_vehicle_inspection_dataset.csv', index=False)
     return df
 
-try:
-    df_vehicles = pd.read_csv('digital_twin_vehicle_inspection_dataset.csv')
-except FileNotFoundError:
-    df_vehicles = generate_project_dataset()
+df_vehicles = get_internal_data()
 
 # ==========================================
-# 2. STREAMLIT ARAYÜZÜ VE DIJITAL İKİZ SİMÜLASYONU
+# 2. STREAMLIT UI - DIGITAL TWIN PLATFORM
 # ==========================================
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Siber-Fiziksel Araç Denetim Ağlarında Dijital İkiz Platformu</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>HGS Makro Veri Akışı, Randevu/Ceza Mekanizması ve İstasyon İçi Esnek Darboğaz Yönetimi Prototipi</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Cyber-Physical Digital Twin Platform for Vehicle Inspection Networks</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>HGS Macro-Data Stream, Dynamic Appointment Fines, and Station-Level Bottleneck Optimization</p>", unsafe_allow_html=True)
 st.hr()
 
-if 'ice_queue' not in st.session_state: st.session_state.ice_queue = 3
-if 'ev_queue' not in st.session_state: st.session_state.ev_queue = 8
-if 'hybrid_mode' not in st.session_state: st.session_state.hybrid_mode = False
-if 'logs' not in st.session_state: st.session_state.logs = []
+# Session State Configuration (Saves state between reruns)
+if 'ice_q' not in st.session_state: st.session_state.ice_q = 4
+if 'ev_q' not in st.session_state: st.session_state.ev_q = 9
+if 'hybrid' not in st.session_state: st.session_state.hybrid = False
 
-col1, col2, col3 = st.columns([1.2, 1, 1])
+col1, col2, col3 = st.columns(3)
 
-# --- SOL SÜTUN: HGS MAKRO AKIŞI ---
+# --- COLUMN 1: MACRO TELEMETRY (HGS STREAM) ---
 with col1:
-    st.header("🛣️ HGS Gişe Canlı Akış Emülatörü")
-    st.write("Otoyol antenlerinden Dijital İkiz bulutuna düşen anlık veriler:")
+    st.subheader("🛣️ HGS Gantry Live Telemetry")
+    st.write("Real-time vehicle detection and compliance checks from highway sensors:")
     
-    run_hgs = st.button("HGS Canlı Akışını Tetikle", key="hgs_btn")
+    run_hgs = st.button("Trigger HGS Data Stream", key="hgs_btn")
     
     if run_hgs:
-        st.session_state.logs = []
-        sample_batch = df_vehicles.sample(6)
-        
-        for idx, row in sample_batch.iterrows():
-            v_id = row['Vehicle_ID']
-            v_type = row['Vehicle_Type']
-            app_status = row['Appointment_Status']
-            days_left = row['Tolerance_Days_Left']
-            
-            if app_status == 'No_Appointment_Unlawful' and days_left < 0:
-                log_msg = f"❌ {v_id} ({v_type}) HGS Geçişi: Muayene Süresi {abs(days_left)} Gün Geçmiş! Otomatik Ceza Kesildi."
-                st.error(log_msg)
-            elif app_status == 'No_Show':
-                log_msg = f"⚠️ {v_id} ({v_type}) HGS Geçişi: Randevuya Gitmeyip Kapasite Bloke Etti! No-Show Cezası Uygulandı."
-                st.warning(log_msg)
+        sample = df_vehicles.sample(4)
+        for idx, row in sample.iterrows():
+            if row['Appointment_Status'] == 'No_Appointment_Unlawful' and row['Tolerance_Days_Left'] < 0:
+                st.error(f"❌ {row['Vehicle_ID']}: Inspection Expired ({abs(row['Tolerance_Days_Left'])} days)! Automated Fine Issued.")
+            elif row['Appointment_Status'] == 'No_Show':
+                st.warning(f"⚠️ {row['Vehicle_ID']}: Missed Appointment (No-Show)! Capacity Block Penalty Applied.")
             else:
-                log_msg = f"✅ {v_id} ({v_type}) HGS Geçişi: Randevusu Planlanmış Zaman Diliminde (Kalan Gün: {days_left})."
-                st.success(log_msg)
-                
-                if v_type == 'ICE': st.session_state.ice_queue += 1
-                else: st.session_state.ev_queue += 1
-            time.sleep(0.4)
+                st.success(f"✅ {row['Vehicle_ID']}: Valid/Scheduled Route.")
+                if row['Vehicle_Type'] == 'ICE': st.session_state.ice_q += 1
+                else: st.session_state.ev_q += 1
 
-# --- ORTA SÜTUN: MİKRO İSTASYON DARBOĞAZ SİMÜLASYONU ---
+# --- COLUMN 2: STATION QUEUE & BOTTLENECK SIMULATION ---
 with col2:
-    st.header("🏢 İstasyon İçi Mikro Kuyruk")
-    st.write("HGS verisine göre anlık oluşan kuyruk ve darboğaz analizi:")
+    st.subheader("🏢 In-Station Queue Status")
+    ev_wait = st.session_state.ev_q * 16 / (2 if st.session_state.hybrid else 1)
     
-    ice_wait = st.session_state.ice_queue * 11 / 2 
-    ev_wait = st.session_state.ev_queue * 16 / (2 if st.session_state.hybrid_mode else 1)
+    st.metric(label="ICE (Conventional) Queue Length", value=f"{st.session_state.ice_q} Vehicles")
+    st.metric(label="EV (Electric Vehicle) Queue Length", value=f"{st.session_state.ev_q} Vehicles", delta=f"Est. Wait Time: {ev_wait:.0f} mins", delta_color="inverse" if ev_wait > 30 else "normal")
     
-    st.metric(label="ICE (Konvansiyonel) Kuyruğu", value=f"{st.session_state.ice_queue} Araç", delta=f"Bekleme ~{ice_wait:.1f} dk")
-    st.metric(label="EV (Elektrikli) Kuyruğu", value=f"{st.session_state.ev_queue} Araç", delta=f"Bekleme ~{ev_wait:.1f} dk", delta_color="inverse" if ev_wait > 30 else "normal")
-    
-    st.subheader("🤖 Dijital İkiz Karar Destek Kararı")
-    if st.session_state.ev_queue >= 7 and not st.session_state.hybrid_mode:
-        st.error("⚠️ DARBOĞAZ ALARMI: EV hattı yoğun! Hat-2'nin hibrit moda geçirilmesi öneriliyor.")
-        if st.button("Hat-2'yi Esnek Hibrit Moda Geçir"):
-            st.session_state.hybrid_mode = True
+    st.subheader("🤖 Digital Twin Decision Support")
+    if st.session_state.ev_q >= 6 and not st.session_state.hybrid:
+        st.error("⚠️ CRITICAL BOTTLENECK: EV queue exceeds threshold! Reassignment of Lane-2 is highly recommended.")
+        if st.button("Deploy Lane-2 to Flexible Hybrid Mode"):
+            st.session_state.hybrid = True
             safe_rerun()
-    elif st.session_state.hybrid_mode:
-        st.success("🔄 Akıllı Hibrit Mod Aktif: Hat-2 çift modlu çalışıyor.")
-        if st.button("Sistem Normale Dön / Esnek Modu Kapat"):
-            st.session_state.hybrid_mode = False
+    elif st.session_state.hybrid:
+        st.success("🔄 Flexible Hybrid Mode Active: Lane-2 processing both ICE & EV.")
+        if st.button("Deactivate Hybrid Mode"):
+            st.session_state.hybrid = False
             safe_rerun()
             
-    if st.button("Kuyruğu Erit (Simülasyonu İlerlet)"):
-        if st.session_state.ice_queue > 0: st.session_state.ice_queue -= np.random.randint(1,3)
-        if st.session_state.ev_queue > 0: st.session_state.ev_queue -= (np.random.randint(2,4) if st.session_state.hybrid_mode else 1)
-        st.session_state.ice_queue = max(0, st.session_state.ice_queue)
-        st.session_state.ev_queue = max(0, st.session_state.ev_queue)
+    if st.button("Process Vehicles (Advance Simulation)"):
+        if st.session_state.ice_q > 0: st.session_state.ice_q -= 1
+        if st.session_state.ev_q > 0: st.session_state.ev_q -= (2 if st.session_state.hybrid else 1)
         safe_rerun()
 
-# --- SAĞ SÜTUN: EV GÜVENLİĞİ VE EMİSYON MANİPÜLASYON ANALİTİĞİ ---
+# --- COLUMN 3: CYBER-PHYSICAL TESTING ROOM ---
 with col3:
-    st.header("🔬 İleri Teknolojik Muayene Odası")
-    st.write("Hatta giren aracın siber-fiziksel test analizör sonuçları:")
-    
-    test_btn = st.button("Rastgele Araç Test Et")
-    if test_btn:
-        test_car = df_vehicles.sample(1).iloc[0]
-        st.markdown(f"**Test Edilen Plaka:** `{test_car['Vehicle_ID']}`")
-        st.markdown(f"**Araç Sınıfı:** `{test_car['Vehicle_Type']}`")
+    st.subheader("🔬 Diagnostic Testing Cell")
+    if st.button("Inspect Next Vehicle in Queue"):
+        car = df_vehicles.sample(1).iloc[0]
+        st.code(f"Plate ID: {car['Vehicle_ID']}\nType: {car['Vehicle_Type']}")
         
-        if test_car['Vehicle_Type'] == 'ICE':
-            st.info("📊 Egzoz Gaz Analizörü & OBD Çapraz Kontrolü")
-            st.write(f"Fiziksel NOx Salınımı: {test_car['NOx_Emissions']:.2f} ppm")
-            st.write(f"OBD Arıza Beyanı: {test_car['OBD_Emission_Status']}")
+        if car['Vehicle_Type'] == 'ICE':
+            st.info("📊 Gas Analyzer & OBD Cross-Reference")
+            st.write(f"Physical NOx Emissions: {car['NOx_Emissions']:.1f} ppm")
             
-            if test_car['Inspection_Result'] == 'Fail_Emission_Fraud':
-                st.error("🚨 MANİPÜLASYON TESPİTİ! OBD temiz ancak fiziksel salınım yüksek. Yazılım/AdBlue Hilesi Saptandı. Red!")
+            if car['Inspection_Result'] == 'Fail_Emission_Fraud':
+                st.error("🚨 EMISSION FRAUD DETECTED! OBD clear but physical emissions exceed legal thresholds. ECU Remap/AdBlue Defeat Software Active. REJECTED.")
             else:
-                st.success("✅ Emisyon Değerleri Yasal Sınırlarda.")
-                
+                st.success("✅ Emission profiles within legal standards.")
         else:
-            st.info("⚡ Yüksek Voltaj İzolasyon & Termal Batarya Taraması")
-            st.write(f"Yalıtım Direnci: {test_car['Insulation_Resistance_M_Ohm']:.1f} MΩ")
-            st.write(f"Max Hücre Sıcaklığı: {test_car['Max_Cell_Temp_C']:.1f} °C")
+            st.info("⚡ High-Voltage Insulation & Thermal Scan")
+            st.write(f"Insulation Resistance: {car['Insulation_Resistance_M_Ohm']:.1f} MΩ")
             
-            if test_car['Inspection_Result'] == 'Fail_EV_Safety':
-                st.error("🚨 EV SAFETY HAZARD! Kritik İzolasyon Sızıntısı veya Aşırı Isınma (Thermal Runaway Riski). Red!")
+            if car['Inspection_Result'] == 'Fail_EV_Safety':
+                st.error("🚨 EV SAFETY HAZARD! Critical insulation breakdown or cell overheating splayed (Thermal Runaway Risk). VEHICLE REJECTED.")
             else:
-                st.success("✅ Batarya Güvenliği Doğrulandı.")
+                st.success("✅ Battery pack high-voltage integrity verified.")
 
 st.hr()
-st.subheader("📈 Veri Seti Dağılım Grafikleri (Jüri Analiz Paneli)")
-c1, c2 = st.columns(2)
-with c1:
-    fig1 = px.histogram(df_vehicles, x="Inspection_Result", color="Vehicle_Type", title="Araç Tipine Göre Muayene Sonuçları", barmode="group", color_discrete_sequence=["#1E3A8A", "#10B981"])
-    st.plotly_chart(fig1, use_container_width=True)
-with c2:
-    fig2 = px.scatter(df_vehicles[df_vehicles['Vehicle_Type']=='EV'], x="Insulation_Resistance_M_Ohm", y="Max_Cell_Temp_C", color="Inspection_Result", title="EV İzolasyon ve Sıcaklık İlişkisi")
-    st.plotly_chart(fig2, use_container_width=True)
+# Native Streamlit Chart (No Plotly Dependency Error)
+st.subheader("📊 Network Inspection Statistics (Jury Analytics Hub)")
+summary_data = df_vehicles['Inspection_Result'].value_counts()
+st.bar_chart(summary_data)
