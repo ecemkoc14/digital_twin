@@ -30,16 +30,13 @@ st.markdown("""
       color: #CBD5E1;
   }
 
-  /* Sidebar */
   section[data-testid="stSidebar"] {
       background: linear-gradient(180deg, #0A1628 0%, #060B14 100%);
       border-right: 1px solid #1E3A5F;
   }
 
-  /* Headers */
   h1, h2, h3, h4 { font-family: 'Syne', sans-serif !important; }
 
-  /* Metric cards */
   [data-testid="stMetric"] {
       background: linear-gradient(135deg, #0F1E35 0%, #0A1628 100%);
       border: 1px solid #1E3A5F;
@@ -54,14 +51,12 @@ st.markdown("""
   [data-testid="stMetricLabel"] { color: #64748B !important; font-size: 0.75rem !important; }
   [data-testid="stMetricDelta"] { font-family: 'Space Mono', monospace !important; }
 
-  /* Dataframe */
   [data-testid="stDataFrame"] {
       border: 1px solid #1E3A5F;
       border-radius: 8px;
       overflow: hidden;
   }
 
-  /* Buttons */
   .stButton > button {
       font-family: 'Space Mono', monospace !important;
       font-weight: 700;
@@ -79,16 +74,13 @@ st.markdown("""
       transform: translateY(-1px);
   }
 
-  /* Divider */
   hr { border-color: #1E3A5F !important; }
 
-  /* Status badges */
   .badge-critical { color: #F87171; font-weight: 700; font-family: 'Space Mono', monospace; }
   .badge-warning  { color: #FBBF24; font-weight: 700; font-family: 'Space Mono', monospace; }
   .badge-ok       { color: #34D399; font-weight: 700; font-family: 'Space Mono', monospace; }
   .badge-info     { color: #38BDF8; font-weight: 700; font-family: 'Space Mono', monospace; }
 
-  /* Section cards */
   .section-card {
       background: linear-gradient(135deg, #0F1E35 0%, #0A1628 100%);
       border: 1px solid #1E3A5F;
@@ -97,10 +89,8 @@ st.markdown("""
       margin-bottom: 18px;
   }
 
-  /* Mono values */
   .mono { font-family: 'Space Mono', monospace; color: #38BDF8; }
 
-  /* Audit log */
   .audit-entry {
       background: #0A1628;
       border-left: 3px solid #1E3A5F;
@@ -115,7 +105,6 @@ st.markdown("""
   .audit-warning  { border-left-color: #FBBF24; color: #FDE68A; }
   .audit-ok       { border-left-color: #34D399; color: #6EE7B7; }
 
-  /* Privacy tag */
   .privacy-tag {
       display: inline-block;
       background: #1E3A5F;
@@ -127,7 +116,6 @@ st.markdown("""
       margin: 2px;
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: #060B14; }
   ::-webkit-scrollbar-thumb { background: #1E3A5F; border-radius: 3px; }
@@ -200,12 +188,12 @@ def generate_national_master_dataset():
             live_nox.append(round(nox_hd, 1)); live_iso.append(np.nan)
             base_risk += 12.0
             fuel_eff.append(round(22 + ag * 0.5, 2))
-        else:  # EV
+        else:
             iso = 750.0 - (ag * 18) - (km / 2500)
             if acc: iso = float(np.random.randint(15, 65))
             live_nox.append(np.nan)
             live_iso.append(round(max(iso, 12.0), 1))
-            fuel_eff.append(round(15 + ag * 0.2, 2))  # kWh/100km
+            fuel_eff.append(round(15 + ag * 0.2, 2))
 
         risk_pct.append(round(min(base_risk, 99.5), 1))
 
@@ -225,14 +213,24 @@ df = generate_national_master_dataset()
 # ====================================================================
 # SESSION STATE INIT
 # ====================================================================
-if 'station_capacities' not in st.session_state:
-    st.session_state.station_capacities = {
-        'Istanbul': {'Status': '🔴 CRITICAL', 'Load_Pct': 92, 'Base_Fee': 90,  'Promo': 0},
-        'Ankara':   {'Status': '🟡 BALANCED', 'Load_Pct': 54, 'Base_Fee': 85,  'Promo': 15},
-        'Izmir':    {'Status': '🟢 OPTIMAL',  'Load_Pct': 31, 'Base_Fee': 80,  'Promo': 25},
-        'Bursa':    {'Status': '🟡 BALANCED', 'Load_Pct': 62, 'Base_Fee': 85,  'Promo': 10},
-        'Antalya':  {'Status': '🟢 OPTIMAL',  'Load_Pct': 24, 'Base_Fee': 75,  'Promo': 30},
-    }
+STATION_CAPACITIES_DEFAULT = {
+    'Istanbul': {'Status': '🔴 CRITICAL', 'Load_Pct': 92, 'Base_Fee': 90,  'Promo': 0},
+    'Ankara':   {'Status': '🟡 BALANCED', 'Load_Pct': 54, 'Base_Fee': 85,  'Promo': 15},
+    'Izmir':    {'Status': '🟢 OPTIMAL',  'Load_Pct': 31, 'Base_Fee': 80,  'Promo': 25},
+    'Bursa':    {'Status': '🟡 BALANCED', 'Load_Pct': 62, 'Base_Fee': 85,  'Promo': 10},
+    'Antalya':  {'Status': '🟢 OPTIMAL',  'Load_Pct': 24, 'Base_Fee': 75,  'Promo': 30},
+}
+
+_required_keys = {'Status', 'Load_Pct', 'Base_Fee', 'Promo'}
+if (
+    'station_capacities' not in st.session_state
+    or not isinstance(st.session_state.station_capacities, dict)
+    or any(
+        not _required_keys.issubset(v.keys())
+        for v in st.session_state.station_capacities.values()
+    )
+):
+    st.session_state.station_capacities = STATION_CAPACITIES_DEFAULT
 
 defaults = {
     'pointer': 0,
@@ -313,19 +311,18 @@ if nav == "🛣️ Highway & Routing":
     st.markdown("<h3 style='color:#38BDF8;'>🛣️ 1. National Highway Gantry Stream & AI Routing Engine</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color:#64748B; font-size:0.85rem;'>Processes vehicle batches passing through HGS gantry nodes. Predictive risk modeling routes traffic away from overloaded stations dynamically.</p>", unsafe_allow_html=True)
 
-    # Live KPI bar
     caps = st.session_state.station_capacities
     k1, k2, k3, k4, k5 = st.columns(5)
     city_cols = [k1, k2, k3, k4, k5]
     for col, (city, info) in zip(city_cols, caps.items()):
-        load = info['Load_Pct']
+        load = info.get('Load_Pct', 50)
         color = "#F87171" if load > 80 else "#FBBF24" if load > 55 else "#34D399"
         col.markdown(f"""
         <div style='background:#0F1E35; border:1px solid #1E3A5F; border-radius:10px;
                     padding:12px 8px; text-align:center; border-top: 3px solid {color};'>
           <div style='font-family:Syne,sans-serif; font-size:0.78rem; color:#94A3B8; margin-bottom:4px;'>{city}</div>
           <div style='font-family:Space Mono,monospace; font-size:1.4rem; color:{color}; font-weight:700;'>{load}%</div>
-          <div style='font-size:0.65rem; color:#475569; margin-top:4px;'>${info['Base_Fee']} · {info['Promo']}% off</div>
+          <div style='font-size:0.65rem; color:#475569; margin-top:4px;'>${info.get('Base_Fee', 85)} · {info.get('Promo', 0)}% off</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -359,7 +356,7 @@ if nav == "🛣️ Highway & Routing":
                 elif risk > 75.0:
                     directive = f"⚠️ RECALL: Risk {risk}%! Diverted to mandatory inspection."
                     lvl = "warning"
-                elif info['Load_Pct'] > 80:
+                elif info.get('Load_Pct', 50) > 80:
                     directive = f"🔄 REROUTED: Station critical load. {promo}% discount applied."
                     lvl = "warning"
                 else:
@@ -399,19 +396,17 @@ if nav == "🛣️ Highway & Routing":
 
     st.divider()
 
-    # Capacity table with visual bar
     st.markdown("<h4 style='color:#E2E8F0;'>🏢 Cross-Regional Facility Capacities</h4>", unsafe_allow_html=True)
     cap_rows = []
     for city, info in caps.items():
-        load = info['Load_Pct']
+        load = info.get('Load_Pct', 50)
         bar_color = "#F87171" if load > 80 else "#FBBF24" if load > 55 else "#34D399"
-        bar_html = f"<div style='background:#1E3A5F;border-radius:4px;height:8px;width:100%;'><div style='background:{bar_color};width:{load}%;height:8px;border-radius:4px;'></div></div>"
         cap_rows.append({
-            "Station Node":     city,
-            "Status":           info['Status'],
-            "Load":             f"{load}%",
-            "Base Fee":         f"${info['Base_Fee']}",
-            "Off-Peak Discount":f"{info['Promo']}%",
+            "Station Node":      city,
+            "Status":            info.get('Status', '🟡 BALANCED'),
+            "Load":              f"{load}%",
+            "Base Fee":          f"${info.get('Base_Fee', 85)}",
+            "Off-Peak Discount": f"{info.get('Promo', 0)}%",
         })
     st.dataframe(pd.DataFrame(cap_rows), use_container_width=True, hide_index=True)
 
@@ -422,7 +417,6 @@ elif nav == "⚠️ Intervention Room":
     st.markdown("<h3 style='color:#FBBF24;'>⚠️ 2. High-Risk Vehicle Intervention Room</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color:#64748B; font-size:0.85rem;'>Live vehicle registries filtered by crash history, high mileage, and AI-calculated failure risk > 75%.</p>", unsafe_allow_html=True)
 
-    # Filters
     f1, f2, f3 = st.columns(3)
     with f1: risk_threshold = st.slider("Risk Threshold %", 50, 99, 75)
     with f2: filter_class   = st.multiselect("Vehicle Class", ['ICE', 'EV', 'Heavy_Duty'], default=['ICE','EV','Heavy_Duty'])
@@ -492,7 +486,6 @@ elif nav == "⚠️ Intervention Room":
                 add_audit(f"Intervention report generated → {selected_target}", "info")
                 st.toast(f"PDF report queued for {selected_target}", icon="📋")
 
-        # Status indicators
         if selected_target in st.session_state.blacklisted:
             st.error("🚫 This vehicle is currently BLACKLISTED. HGS gantry lock is active.")
         if selected_target in st.session_state.sms_sent:
@@ -532,10 +525,9 @@ elif nav == "🔬 Diagnostic Grid":
         """, unsafe_allow_html=True)
 
         if car['Vehicle_Class'] in ['ICE', 'Heavy_Duty']:
-            # ---- ICE / HEAVY DUTY ----
             nox = car['Measured_NOx_ppm']
-            euro6_limit_ice   = 80.0
-            euro6_limit_hd    = 460.0
+            euro6_limit_ice = 80.0
+            euro6_limit_hd  = 460.0
             limit = euro6_limit_ice if car['Vehicle_Class'] == 'ICE' else euro6_limit_hd
             pass_fail = nox <= limit
 
@@ -546,7 +538,6 @@ elif nav == "🔬 Diagnostic Grid":
             m2.metric("Euro 6 Limit (ppm)", f"{limit:.0f}")
             m3.metric("Exceedance Ratio", f"{nox/limit:.2f}x", delta_color="inverse" if nox > limit else "normal")
 
-            # Gauge chart
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=nox,
@@ -588,16 +579,14 @@ NOx reading of **{nox:.1f} ppm** exceeds the Euro 6 limit of **{limit:.0f} ppm**
                 st.success(f"✅ **VERDICT: PASS** — NOx {nox:.1f} ppm is within Euro 6 limits ({limit:.0f} ppm).")
                 add_audit(f"Emission PASS {car['Vehicle_ID']}: {nox:.1f}ppm", "ok")
 
-            # CO2 estimate
             st.markdown("<h5 style='color:#64748B; margin-top:16px;'>Estimated Supplementary Emissions</h5>", unsafe_allow_html=True)
             e1, e2 = st.columns(2)
             e1.metric("Est. CO₂ (g/km)", f"{round(95 + car['Age_Years']*3 + (1 if car['Major_Chassis_Accident'] else 0)*20, 1)}")
             e2.metric("Fuel Efficiency (L/100km)", f"{car['Energy_Consumption']:.1f}")
 
         else:
-            # ---- EV ----
             iso   = car['Measured_Isolation_M_Ohm']
-            limit = 100.0  # ECE-R100 minimum
+            limit = 100.0
             pass_fail = iso >= limit
 
             st.markdown("<h4 style='color:#94A3B8;'>⚡ ECE-R100 Battery Isolation & Thermal Safety Scan</h4>", unsafe_allow_html=True)
@@ -607,7 +596,6 @@ NOx reading of **{nox:.1f} ppm** exceeds the Euro 6 limit of **{limit:.0f} ppm**
             m2.metric("ECE-R100 Minimum (MΩ)", f"{limit:.0f}")
             m3.metric("Safety Margin", f"{iso/limit:.2f}x", delta_color="normal" if pass_fail else "inverse")
 
-            # Gauge
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=iso,
@@ -649,7 +637,6 @@ Isolation resistance **{iso:.1f} MΩ** is critically below the ECE-R100 minimum 
                 st.success(f"✅ **VERDICT: PASS** — Isolation {iso:.1f} MΩ exceeds ECE-R100 minimum ({limit:.0f} MΩ).")
                 add_audit(f"EV Isolation PASS {car['Vehicle_ID']}: {iso:.1f}MΩ", "ok")
 
-            # Extra EV metrics
             st.markdown("<h5 style='color:#64748B; margin-top:16px;'>Battery Health Indicators</h5>", unsafe_allow_html=True)
             e1, e2, e3 = st.columns(3)
             soh = max(20, round(100 - car['Age_Years'] * 3.5 - (20 if car['Major_Chassis_Accident'] else 0), 1))
@@ -695,7 +682,6 @@ elif nav == "📊 Analytics Dashboard":
                                coloraxis_showscale=False)
             st.plotly_chart(fig, use_container_width=True)
 
-        # Risk distribution histogram
         fig = px.histogram(df, x='AI_Calculated_Risk_Pct', nbins=40,
                            color='Vehicle_Class',
                            color_discrete_map={'ICE':'#38BDF8','EV':'#34D399','Heavy_Duty':'#F87171'},
@@ -736,7 +722,6 @@ elif nav == "📊 Analytics Dashboard":
                                font_color='#94A3B8', title_font_color='#E2E8F0')
             st.plotly_chart(fig, use_container_width=True)
 
-        # Months since inspection heatmap
         heat_data = df.groupby(['Current_City','Vehicle_Class'])['Months_Since_Last_Inspection'].mean().unstack(fill_value=0)
         fig = px.imshow(heat_data, color_continuous_scale='RdYlGn_r',
                         title="Avg. Months Since Last Inspection (City × Class)")
@@ -751,7 +736,6 @@ elif nav == "🔐 Data Privacy & KVKK":
     st.markdown("<h3 style='color:#A78BFA;'>🔐 5. Data Privacy & KVKK / GDPR Compliance Module</h3>", unsafe_allow_html=True)
     st.markdown("<p style='color:#64748B; font-size:0.85rem;'>Responsible data governance framework for the national vehicle inspection digital twin. Aligned with KVKK (Law No. 6698) and GDPR principles.</p>", unsafe_allow_html=True)
 
-    # ── Data Classification Panel ──
     st.markdown("<h4 style='color:#E2E8F0; margin-top:24px;'>📂 Data Classification Registry</h4>", unsafe_allow_html=True)
     classification_data = [
         {"Data Field": "Vehicle_ID (Plate)",    "Category": "Personal Data",    "KVKK Class": "Art. 6 General",   "Retention": "5 years", "Masked": "Yes", "Justification": "Traffic safety enforcement"},
@@ -768,7 +752,6 @@ elif nav == "🔐 Data Privacy & KVKK":
 
     st.divider()
 
-    # ── Consent Management ──
     col_a, col_b = st.columns(2)
 
     with col_a:
@@ -830,7 +813,6 @@ elif nav == "🔐 Data Privacy & KVKK":
 
     st.divider()
 
-    # ── Privacy Risk Assessment ──
     st.markdown("<h4 style='color:#E2E8F0;'>🔍 Privacy Risk Assessment (DPIA)</h4>", unsafe_allow_html=True)
     dpia_data = [
         {"Processing Activity": "AI Risk Profiling",        "Risk Level": "🔴 HIGH",   "Mitigation": "Explainability module + human review gate",              "Status": "In Progress"},
@@ -844,7 +826,6 @@ elif nav == "🔐 Data Privacy & KVKK":
 
     st.divider()
 
-    # ── AI Transparency / Model Card ──
     st.markdown("<h4 style='color:#E2E8F0;'>🤖 AI Model Card — Risk Scoring Engine</h4>", unsafe_allow_html=True)
     mc1, mc2 = st.columns(2)
     with mc1:
