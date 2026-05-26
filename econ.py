@@ -6,7 +6,6 @@ import time
 # ==========================================
 # BACKWARD COMPATIBILITY FUNCTION FOR RERUN
 # ==========================================
-# This function automatically detects your Streamlit version to prevent AttributeError
 def safe_rerun():
     if hasattr(st, "rerun"):
         st.rerun()
@@ -54,9 +53,11 @@ df_vehicles = get_internal_data()
 # ==========================================
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Cyber-Physical Digital Twin Platform for Vehicle Inspection Networks</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>HGS Macro-Data Stream, Dynamic Appointment Fines, and Station-Level Bottleneck Optimization</p>", unsafe_allow_html=True)
-st.hr()
 
-# Session State Configuration (Saves state between reruns)
+# FIX 1: Changed from st.hr() to st.divider()
+st.divider()
+
+# Session State Configuration
 if 'ice_q' not in st.session_state: st.session_state.ice_q = 4
 if 'ev_q' not in st.session_state: st.session_state.ev_q = 9
 if 'hybrid' not in st.session_state: st.session_state.hybrid = False
@@ -81,6 +82,7 @@ with col1:
                 st.success(f"✅ {row['Vehicle_ID']}: Valid/Scheduled Route.")
                 if row['Vehicle_Type'] == 'ICE': st.session_state.ice_q += 1
                 else: st.session_state.ev_q += 1
+        safe_rerun()
 
 # --- COLUMN 2: STATION QUEUE & BOTTLENECK SIMULATION ---
 with col2:
@@ -131,8 +133,10 @@ with col3:
             else:
                 st.success("✅ Battery pack high-voltage integrity verified.")
 
-st.hr()
-# Native Streamlit Chart (No Plotly Dependency Error)
+# FIX 2: Changed from st.hr() to st.divider()
+st.divider()
+
+# Native Streamlit Chart
 st.subheader("📊 Network Inspection Statistics (Jury Analytics Hub)")
 summary_data = df_vehicles['Inspection_Result'].value_counts()
 st.bar_chart(summary_data)
